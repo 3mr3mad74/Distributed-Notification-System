@@ -13,3 +13,5 @@
 /Notification Service/obj
 /Notification Service/Properties
 /NotificationServicePackage/obj
+/NotificationServicePackage/bin/Release
+/NotificationServicePackage/bin/Debug/net8.0
