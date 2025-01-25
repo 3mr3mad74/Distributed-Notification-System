@@ -5,13 +5,19 @@ using Infrastructure.Repository;
 using Infrastructure.RabbitMQ;
 using Application.Models;
 using Serilog;
-using Microsoft.Extensions.Hosting;
+using Infrastructure.Data;
+using Microsoft.EntityFrameworkCore;
 
 
 namespace Notification_Service
 {
     public class Program
     {
+        public IConfiguration Configuration { get; }
+        public Program(IConfiguration configuration)
+        {
+            Configuration = configuration;
+        }
         public static void Main(string[] args)
         {
             var builder = WebApplication.CreateBuilder(args);
@@ -36,14 +42,18 @@ namespace Notification_Service
             builder.Services.Configure<SendGridSettings>(builder.Configuration.GetSection("SendGrid"));
             builder.Services.Configure<TwilioSettings>(builder.Configuration.GetSection("Twilio"));
 
+            builder.Services.AddDbContext<ApplicationDbContext>(
+              options => options.UseMySql(
+                  builder.Configuration.GetConnectionString("DefaultConnection"),
+                  ServerVersion.AutoDetect(builder.Configuration.GetConnectionString("DefaultConnection"))
+              )
+          );
+
+
             Log.Logger = new LoggerConfiguration()
                 .WriteTo.File("D:/NotifiactionLogs.txt")  
                 .CreateLogger();
-
             builder.Host.UseSerilog();
-
-
-
             var app = builder.Build();
             if (app.Environment.IsDevelopment())
             {

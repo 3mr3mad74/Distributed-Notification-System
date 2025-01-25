@@ -2,9 +2,11 @@
 using Application.Contracts;
 using Application.Models;
 using Application.Services;
+using Infrastructure.Data;
 using Infrastructure.Repository;
 using Infrastructure.SignalR;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
@@ -23,13 +25,16 @@ namespace Infrastructure.RabbitMQ
         private IModel _channel;
         private string _queueName;
         private readonly IHubContext<NotificationHub> _hubContext;
+   
+
+
 
         public NotificationListener(IConfiguration configuration, IHubContext<NotificationHub> hubContext)
         {
             _configuration = configuration;
             _queueName = _configuration.GetSection("RabbitMQ:queueName").Value;
             _hubContext = hubContext;
-
+           
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -73,22 +78,26 @@ namespace Infrastructure.RabbitMQ
         }
         private void ProcessMessage(string message, ulong deliveryTag)
         {
+            var connectionString = _configuration.GetConnectionString("DefaultConnection");
+            var context = new ApplicationDbContext(
+         new DbContextOptionsBuilder<ApplicationDbContext>()
+             .UseMySql(connectionString, ServerVersion.AutoDetect(connectionString))
+             .Options);
             try
             {
                 var jsonMessage = JObject.Parse(message);
-                var type = jsonMessage["Type"].ToString();
+                var type = jsonMessage["CommunicationChannels"].ToString();
                 Log.Information("Processing message of type {Type}.", type);
+                    var notifactionDatabaseRepository = new NotificationDatabaseRepository(context);
+                    var notifactionRepository = new NotifactionSignalRRepository(_hubContext);
 
-                var notifactionRepository = new NotifactionSignalRRepository(_hubContext);
-
-                var notifactionDatabaseRepository = new NotificationDatabaseRepository();
-                var notificationTypeFactory = new NotificationTypeFactory(notifactionRepository , notifactionDatabaseRepository);
-                var notifactionService = new NotificationService(notificationTypeFactory, notifactionRepository);
-
-                Log.Information("Handling notification message of type {Type}.", type);
-                notifactionService.HandleNotificationMessage(type, message);
-                Log.Information("Notification message handled successfully.");
-
+                    var notificationTypeFactory = new NotificationTypeFactory(notifactionRepository, notifactionDatabaseRepository);
+                    var notifactionService = new NotificationService(notificationTypeFactory, notifactionRepository);
+                    Log.Information("Handling notification message of type {Type}.", type);
+                    notifactionService.HandleNotificationMessage(type, message);
+                    Log.Information("Notification message handled successfully.");
+               
+                   
                 _channel.BasicAck(deliveryTag, multiple: false);
                 Log.Information("Message acknowledged with delivery tag {DeliveryTag}.", deliveryTag);
             }
@@ -97,6 +106,7 @@ namespace Infrastructure.RabbitMQ
                 Log.Error(ex, "An error occurred while processing the message: {Message}", message);
                 _channel.BasicReject(deliveryTag, requeue: false);
             }
+            
         }
 
        

@@ -9,13 +9,11 @@ namespace Domain.Entities
 {
     public abstract class Notification
     {
-        public int Id { get; set; }
-        public  string Message { get; set; }
+        public string ApplicationId { get; set; }
         public string UserId { get; set; }
         public string TenantId { get; set; }
-        public DateTime CreatedDate { get; set; } = DateTime.UtcNow;
+        public  string Message { get; set; }
         public CommunicationChannels CommunicationChannels { get; set; }
-        public string? Metadata { get; set; }
 
     }
 }
